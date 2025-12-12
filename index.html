@@ -3,343 +3,366 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assignment MLE - Custom Paraphrase Generator</title>
+    <title>Ultimate In-Browser MLE Evaluation Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
+        .spinner { border: 3px solid rgba(59, 130, 246, 0.2); border-top: 3px solid #3b82f6; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Preserves formatting while wrapping text */
-        .formatted-output { white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', Courier, monospace; }
-        .busy-disabled { opacity: 0.6; pointer-events: none; cursor: not-allowed; }
+        .formatted-output { white-space: pre-wrap; word-wrap: break-word; font-family: 'ui-monospace', 'SFMono-Regular', Menlo, Consolas, monospace; }
+        .busy-disabled { opacity: 0.7; pointer-events: none; cursor: wait; filter: grayscale(30%); }
+        .progress-bar-fill { transition: width 0.3s ease-in-out; }
+        /* Table & Tab Styles */
+        .metrics-table th { background-color: #f8fafc; color: #64748b; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.75rem 1rem; }
+        .metrics-table td { padding: 0.75rem 1rem; border-top: 1px solid #e2e8f0; font-variant-numeric: tabular-nums; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #1d4ed8; background-color: #eff6ff; }
+        /* Diff Highlighting */
+        .diff-ins { background-color: #dcfce7; color: #15803d; padding: 2px 0; text-decoration: none; }
+        .diff-del { background-color: #fee2e2; color: #b91c1c; text-decoration: line-through; padding: 2px 0; }
     </style>
 </head>
-<body class="p-6">
+<body class="p-4 md:p-6 lg:p-8">
 
-<div class="max-w-7xl mx-auto space-y-6">
+<div class="max-w-[1600px] mx-auto space-y-6">
     
-    <header class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h1 class="text-2xl font-bold text-gray-800">Custom Paraphrase Generator (CPG)</h1>
-        <p class="text-gray-500 text-sm mt-1">Non-blocking Interface • Web Worker Integration • Structure Preservation</p>
-        <div id="status" class="mt-4 text-sm px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full inline-flex items-center gap-2">
+    <header class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-extrabold text-gray-800 flex items-center gap-3">
+                <i class="fas fa-microchip text-blue-600"></i> Ultimate Browser-Based Evaluation Platform
+            </h1>
+            <p class="text-gray-500 text-sm mt-1 ml-9 font-medium">Parallel Inference • Visual Diffing • Multi-Metric Radar Analysis</p>
+        </div>
+        <div id="globalStatus" class="mt-4 md:mt-0 text-sm px-5 py-2.5 bg-yellow-50 text-yellow-700 rounded-full inline-flex items-center gap-3 font-semibold border border-yellow-100 shadow-sm">
             <span class="spinner"></span>
-            <span id="statusText">Initializing Worker...</span>
+            <span id="globalStatusText">Initializing Neural Engines (please wait)...</span>
         </div>
     </header>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
         
-        <div class="space-y-4">
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-full">
+        <div class="xl:col-span-3 flex flex-col">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-semibold text-gray-700">Input Text</h2>
-                    <div class="space-x-2" id="sampleButtons">
-                        <button onclick="loadLetterSample()" class="text-blue-600 text-xs hover:underline bg-blue-50 px-2 py-1 rounded">Load Letter</button>
-                        <button onclick="loadPDFSample()" class="text-blue-600 text-xs hover:underline bg-blue-50 px-2 py-1 rounded">Load PDF Text</button>
+                    <h2 class="font-bold text-gray-700 flex items-center gap-2"><i class="far fa-keyboard"></i> Input Text</h2>
+                    <div class="flex gap-2">
+                         <button onclick="loadSample('letter')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">Letter Sample</button>
+                         <button onclick="loadSample('pdf')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">Definition Sample</button>
                     </div>
                 </div>
-                <textarea id="inputText" class="w-full h-96 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono text-sm" placeholder="Paste your text here..."></textarea>
+                <textarea id="inputText" class="flex-grow w-full min-h-[350px] p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono text-sm shadow-inner bg-gray-50 transition-all" placeholder="Waiting for models to load..."></textarea>
                 
-                <div class="flex justify-between mt-2 text-sm text-gray-500">
-                    <span id="inputWordCount">Words: 0</span>
-                    <span id="inputStatus" class="text-gray-400">Ready</span>
-                </div>
-                
-                <button id="generateBtn" onclick="startGeneration()" disabled class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2">
-                    Generate Paraphrase
-                </button>
-                
-                <div id="progressContainer" class="hidden mt-4 space-y-2">
-                    <div class="flex justify-between text-xs text-gray-500">
-                        <span id="timerLabel">Time: 0.0s</span>
-                        <span id="progressLabel">0%</span>
+                <div class="flex flex-col gap-3 mt-4">
+                    <div class="flex justify-between text-sm text-gray-500 font-medium">
+                        <span id="inputWc"><i class="fas fa-font"></i> 0 words</span>
+                        <span id="inputReadability"><i class="fas fa-book-reader"></i> Readability: -</span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                        <div id="progressFill" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
+                    <button id="generateBtn" onclick="startParallelGeneration()" disabled class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 shadow-md text-sm">
+                        <span>RUN FULL EVALUATION</span> <i class="fas fa-rocket"></i>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div class="space-y-4">
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative">
-                <div class="absolute top-0 left-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-br-lg rounded-tl-lg">CPG MODEL</div>
-                <h2 class="font-semibold text-gray-700 mb-4 pl-20">Generated Output</h2>
-                
-                <div id="outputContainer" class="h-64 overflow-y-auto p-4 bg-gray-50 rounded-lg border border-gray-200 text-gray-700 text-sm leading-relaxed formatted-output">
-                    <span class="text-gray-400 italic font-sans">Output will appear here retaining your format...</span>
+        <div class="xl:col-span-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="flex flex-col h-full">
+                <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-3 rounded-t-2xl border-b border-blue-200 flex justify-between items-center">
+                    <div><h3 class="font-bold text-blue-900 text-sm"><i class="fas fa-robot"></i> Model A (Speed Focus)</h3><p class="text-[10px] text-blue-700">LaMini-Flan-T5-77M</p></div>
+                    <div id="statusA" class="text-[10px] px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full flex items-center gap-1"><span class="spinner"></span> Loading...</div>
                 </div>
-
-                <div class="flex justify-between mt-2 text-sm text-gray-500">
-                    <span id="outputWordCount">Words: 0</span>
-                    <span id="lengthRatio" class="font-mono bg-gray-200 px-2 rounded">Len Ratio: 0%</span>
+                 <div id="progContA" class="hidden bg-blue-200 h-1 w-full"><div id="progFillA" class="bg-blue-600 h-1 progress-bar-fill" style="width: 0%"></div></div>
+                <div class="flex bg-gray-100 border-b border-gray-200 text-xs font-medium text-gray-500">
+                    <button onclick="switchTab('A', 'text')" id="tabAtext" class="flex-1 py-2 text-center tab-active transition-all">Clean Text</button>
+                    <button onclick="switchTab('A', 'diff')" id="tabAdiff" class="flex-1 py-2 text-center transition-all">Diff View 🔥</button>
                 </div>
+                <div class="relative flex-grow bg-white border-l border-r border-gray-200">
+                     <button onclick="copyToClipboard('outputA')" class="absolute top-2 right-2 bg-gray-100 hover:bg-gray-200 text-gray-500 p-1.5 rounded-md transition z-10" title="Copy Text"><i class="far fa-copy"></i></button>
+                    <div id="outputAtext" class="h-96 overflow-y-auto p-4 text-sm leading-relaxed formatted-output text-gray-800"><span class="text-gray-400 italic">Waiting...</span></div>
+                    <div id="outputAdiff" class="hidden h-96 overflow-y-auto p-4 text-sm leading-relaxed formatted-output text-gray-800 bg-gray-50"></div>
+                </div>
+                 <div class="bg-gray-50 p-2 text-[11px] text-gray-500 border border-t-0 border-gray-200 rounded-b-2xl flex justify-between items-center">
+                    <span id="wcA">Words: 0</span> <span id="ratioA" class="font-semibold px-2 py-0.5 rounded bg-gray-200">Ratio: 0%</span>
+                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative">
-                <div class="absolute top-0 left-0 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-br-lg rounded-tl-lg">BENCHMARK LLM</div>
-                <div class="flex justify-between items-center mb-2 pl-24">
-                    <h2 class="font-semibold text-gray-700">Comparison</h2>
-                    <span class="text-xs text-gray-400">Paste ChatGPT/Gemini output here</span>
+             <div class="flex flex-col h-full">
+                <div class="bg-gradient-to-r from-purple-50 to-purple-100 p-3 rounded-t-2xl border-b border-purple-200 flex justify-between items-center">
+                    <div><h3 class="font-bold text-purple-900 text-sm"><i class="fas fa-brain"></i> Model B (Quality Focus)</h3><p class="text-[10px] text-purple-700">LaMini-Flan-T5-248M</p></div>
+                    <div id="statusB" class="text-[10px] px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full flex items-center gap-1"><span class="spinner"></span> Loading...</div>
                 </div>
-                <textarea id="llmInputText" oninput="updateMetrics()" class="w-full h-32 p-3 border border-gray-300 rounded-lg text-sm font-mono" placeholder="Paste external LLM output here to compare metrics..."></textarea>
+                 <div id="progContB" class="hidden bg-purple-200 h-1 w-full"><div id="progFillB" class="bg-purple-600 h-1 progress-bar-fill" style="width: 0%"></div></div>
+                <div class="flex bg-gray-100 border-b border-gray-200 text-xs font-medium text-gray-500">
+                    <button onclick="switchTab('B', 'text')" id="tabBtext" class="flex-1 py-2 text-center tab-active transition-all">Clean Text</button>
+                    <button onclick="switchTab('B', 'diff')" id="tabBdiff" class="flex-1 py-2 text-center transition-all">Diff View 🔥</button>
+                </div>
+                <div class="relative flex-grow bg-white border-l border-r border-gray-200">
+                     <button onclick="copyToClipboard('outputB')" class="absolute top-2 right-2 bg-gray-100 hover:bg-gray-200 text-gray-500 p-1.5 rounded-md transition z-10" title="Copy Text"><i class="far fa-copy"></i></button>
+                    <div id="outputBtext" class="h-96 overflow-y-auto p-4 text-sm leading-relaxed formatted-output text-gray-800"><span class="text-gray-400 italic">Waiting...</span></div>
+                    <div id="outputBdiff" class="hidden h-96 overflow-y-auto p-4 text-sm leading-relaxed formatted-output text-gray-800 bg-gray-50"></div>
+                </div>
+                 <div class="bg-gray-50 p-2 text-[11px] text-gray-500 border border-t-0 border-gray-200 rounded-b-2xl flex justify-between items-center">
+                    <span id="wcB">Words: 0</span> <span id="ratioB" class="font-semibold px-2 py-0.5 rounded bg-gray-200">Ratio: 0%</span>
+                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h2 class="font-bold text-gray-800 mb-4 border-b pb-2">Evaluation Metrics</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="metric-card bg-blue-50 p-4 rounded-lg border border-blue-100">
-                <div class="text-blue-800 text-sm font-semibold mb-1">System Latency</div>
-                <div id="metricLatency" class="text-2xl font-bold text-blue-900">-</div>
-                <div class="text-xs text-blue-600 mt-1">Processing time</div>
+        <div class="xl:col-span-3 flex flex-col gap-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+                <h2 class="font-bold text-gray-700 mb-4 flex items-center gap-2 text-sm"><i class="fas fa-chart-radar text-indigo-500"></i> Multi-Metric Profile</h2>
+                <div class="h-56 relative">
+                    <canvas id="radarChart"></canvas>
+                </div>
             </div>
-            <div class="metric-card bg-purple-50 p-4 rounded-lg border border-purple-100">
-                <div class="text-purple-800 text-sm font-semibold mb-1">Length Compliance</div>
-                <div id="metricCompliance" class="text-2xl font-bold text-purple-900">-</div>
-                <div class="text-xs text-purple-600 mt-1">Target: > 80%</div>
-            </div>
-            <div class="metric-card bg-green-50 p-4 rounded-lg border border-green-100">
-                <div class="text-green-800 text-sm font-semibold mb-1">CPG Overlap Score</div>
-                <div id="metricCpgScore" class="text-2xl font-bold text-green-900">-</div>
-                <div class="text-xs text-green-600 mt-1">Jaccard Similarity</div>
-            </div>
-             <div class="metric-card bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <div class="text-gray-800 text-sm font-semibold mb-1">LLM Overlap Score</div>
-                <div id="metricLlmScore" class="text-2xl font-bold text-gray-900">-</div>
-                <div class="text-xs text-gray-600 mt-1">Benchmark</div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex-grow">
+                 <div class="p-4 border-b border-gray-200 bg-gray-50">
+                     <h2 class="font-bold text-gray-700 flex items-center gap-2 text-sm"><i class="fas fa-table text-gray-500"></i> Comparative Metrics</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full metrics-table text-xs text-left text-gray-600">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Model A</th>
+                                <th>Model B</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr><td class="font-medium">Latency</td><td id="tLatA" class="font-mono">-</td><td id="tLatB" class="font-mono">-</td></tr>
+                            <tr class="bg-gray-50/50"><td class="font-medium">Length Ratio</td><td id="tRatA" class="font-bold">-</td><td id="tRatB" class="font-bold">-</td></tr>
+                            <tr><td class="font-medium" title="Longest Common Subsequence">ROUGE-L (Struct)</td><td id="tRlA" class="font-mono">-</td><td id="tRlB" class="font-mono">-</td></tr>
+                            <tr class="bg-gray-50/50"><td class="font-medium" title="Unigram Overlap">ROUGE-1 (Word)</td><td id="tR1A" class="font-mono">-</td><td id="tR1B" class="font-mono">-</td></tr>
+                            <tr><td class="font-medium" title="Flesch-Kincaid Change">Readability Δ</td><td id="tReadA" class="font-mono">-</td><td id="tReadB" class="font-mono">-</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script id="worker-code" type="javascript/worker">
-    // This code runs in the background thread
     import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
-
-    env.allowLocalModels = false;
-    env.useBrowserCache = true;
-
-    let generator = null;
-
+    env.allowLocalModels = false; env.useBrowserCache = true;
+    let generator = null; let modelId = null;
     self.onmessage = async (e) => {
         const { type, data } = e.data;
-
         if (type === 'init') {
-            try {
-                // Load Model
-                self.postMessage({ type: 'status', status: 'loading' });
-                generator = await pipeline('text2text-generation', 'Xenova/LaMini-Flan-T5-248M');
-                self.postMessage({ type: 'status', status: 'ready' });
-            } catch (err) {
-                self.postMessage({ type: 'error', message: err.message });
-            }
+            modelId = data.modelId;
+            try { self.postMessage({ type: 'status', status: 'loading' }); generator = await pipeline('text2text-generation', modelId); self.postMessage({ type: 'status', status: 'ready' }); } catch (err) { self.postMessage({ type: 'error', message: err.message }); }
         }
-
         if (type === 'generate') {
             if (!generator) return;
-
-            const rawText = data.text;
-            const lines = rawText.split('\n');
+            const startTime = performance.now();
+            const lines = data.text.split('\n').filter(line => line.trim().length > 0);
             let processedLines = [];
-            
-            // Iterate lines
+            self.postMessage({ type: 'start_gen' });
             for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const trimmed = line.trim();
-                const lineWordCount = trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
-
-                // 1. Process Logic
-                let resultLine = line;
-
-                // Simple heuristic: If empty or short (<15 words), keep original (Header/Date/Salutation)
-                if (trimmed.length > 0 && lineWordCount >= 15) {
+                let resultLine = lines[i];
+                const wc = resultLine.trim().split(/\s+/).length;
+                if (wc >= 8) { // Only process substantial lines
                     try {
-                        const prompt = `Paraphrase this paragraph formally and in detail: ${trimmed}`;
-                        const output = await generator(prompt, {
-                            max_new_tokens: 512,
-                            min_length: Math.floor(lineWordCount * 0.9),
-                            temperature: 0.6,
-                            repetition_penalty: 1.2,
-                            do_sample: true
+                        // Engineered prompt for better paraphrasing
+                        const output = await generator(`Rephrase the following paragraph to improve clarity and vocabulary while keeping the same meaning and roughly the same length: ${lines[i]}`, {
+                            max_new_tokens: 512, min_length: Math.floor(wc * 0.85), temperature: 0.7, repetition_penalty: 1.2, do_sample: true
                         });
                         resultLine = output[0].generated_text;
-                    } catch (e) {
-                        resultLine = line; // Fallback
-                    }
+                    } catch (e) { console.error(e); }
                 }
-
                 processedLines.push(resultLine);
-
-                // 2. Send Partial Update back to Main Thread
-                self.postMessage({
-                    type: 'progress',
-                    progress: Math.round(((i + 1) / lines.length) * 100),
-                    currentText: processedLines.join('\n')
-                });
+                self.postMessage({ type: 'progress', progress: Math.round(((i + 1) / lines.length) * 100), currentText: processedLines.join('\n\n') });
             }
-
-            // 3. Complete
-            self.postMessage({
-                type: 'complete',
-                text: processedLines.join('\n')
-            });
+            self.postMessage({ type: 'complete', text: processedLines.join('\n\n'), latency: (performance.now() - startTime)/1000 });
         }
     };
 </script>
 
 <script type="module">
-    // UI Elements
-    const statusDiv = document.getElementById('status');
-    const statusText = document.getElementById('statusText');
-    const generateBtn = document.getElementById('generateBtn');
-    const inputArea = document.getElementById('inputText');
-    const outputArea = document.getElementById('outputContainer');
-    const progressContainer = document.getElementById('progressContainer');
-    const progressFill = document.getElementById('progressFill');
-    const progressLabel = document.getElementById('progressLabel');
-    const timerLabel = document.getElementById('timerLabel');
-    const sampleButtons = document.getElementById('sampleButtons');
+    const models = {
+        A: { id: 'Xenova/LaMini-Flan-T5-77M', worker: null, ready: false, generating: false, text: "", metrics: {} },
+        B: { id: 'Xenova/LaMini-Flan-T5-248M', worker: null, ready: false, generating: false, text: "", metrics: {} }
+    };
+    const els = { input: document.getElementById('inputText'), btn: document.getElementById('generateBtn'), globalStatus: document.getElementById('globalStatus') };
+    let radarChart = null;
 
-    let worker = null;
-    let timerInterval = null;
-    let startTime = 0;
-    let isModelReady = false;
-
-    // 1. Setup Worker
-    function initWorker() {
+    function initSystem() {
         const blob = new Blob([document.getElementById('worker-code').textContent], { type: 'application/javascript' });
-        worker = new Worker(URL.createObjectURL(blob), { type: 'module' });
+        const workerUrl = URL.createObjectURL(blob);
+        for (const key in models) {
+            models[key].worker = new Worker(workerUrl, { type: 'module' });
+            setupListener(key);
+            models[key].worker.postMessage({ type: 'init', data: { modelId: models[key].id } });
+        }
+        initRadarChart();
+    }
 
-        worker.onmessage = function(e) {
-            const { type, status, message, progress, currentText, text } = e.data;
-
-            if (type === 'status') {
-                if (status === 'loading') {
-                    statusText.innerText = "Downloading Model (~250MB)...";
-                } else if (status === 'ready') {
-                    statusDiv.className = "mt-4 text-sm px-3 py-1 bg-green-100 text-green-800 rounded-full inline-flex items-center gap-2";
-                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> <span>Model Ready</span>';
-                    isModelReady = true;
-                    validateInput();
-                }
-            } else if (type === 'error') {
-                statusDiv.className = "mt-4 text-sm px-3 py-1 bg-red-100 text-red-800 rounded-full inline-flex items-center gap-2";
-                statusText.innerText = "Error: " + message;
-            } else if (type === 'progress') {
-                // Update Progress Bar
-                progressFill.style.width = `${progress}%`;
-                progressLabel.innerText = `${progress}%`;
-                // Live Text Update
-                outputArea.innerText = currentText;
-            } else if (type === 'complete') {
-                finishGeneration(text);
+    function setupListener(key) {
+        const statusEl = document.getElementById(`status${key}`);
+        const progCont = document.getElementById(`progCont${key}`);
+        const progFill = document.getElementById(`progFill${key}`);
+        models[key].worker.onmessage = function(e) {
+            const { type, status, progress, currentText, text, latency } = e.data;
+            switch(type) {
+                case 'status':
+                    if (status === 'ready') {
+                        models[key].ready = true;
+                        statusEl.innerHTML = '<i class="fas fa-check-circle"></i> Ready'; statusEl.className = "text-[10px] px-2 py-0.5 bg-green-100 text-green-800 rounded-full flex items-center gap-1";
+                        checkGlobalReady();
+                    } break;
+                case 'start_gen': progCont.classList.remove('hidden'); progFill.style.width = '5%'; break;
+                case 'progress': progFill.style.width = `${progress}%`; document.getElementById(`output${key}text`).innerText = currentText; break;
+                case 'complete':
+                    models[key].generating = false; models[key].text = text; models[key].metrics.latency = latency;
+                    progCont.classList.add('hidden'); document.getElementById(`output${key}text`).innerText = text;
+                    calculateAndDisplayMetrics(key); checkGlobalFinished(); break;
             }
         };
-
-        // Initialize Model inside Worker
-        worker.postMessage({ type: 'init' });
     }
 
-    // 2. Generation Control
-    window.startGeneration = function() {
-        if (!isModelReady) return;
-        
-        // Lock UI
-        inputArea.classList.add('busy-disabled');
-        sampleButtons.classList.add('busy-disabled');
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = '<span class="spinner"></span> Processing...';
-        progressContainer.classList.remove('hidden');
-        outputArea.innerText = "";
-        
-        startTime = performance.now();
-        
-        // Start Timer (This will now remain smooth because work is in background)
-        timerInterval = setInterval(() => {
-            const t = ((performance.now() - startTime) / 1000).toFixed(1);
-            timerLabel.innerText = `Time: ${t}s`;
-        }, 100);
+    function checkGlobalReady() {
+        if (Object.values(models).every(m => m.ready)) {
+            els.globalStatus.className = "mt-4 md:mt-0 text-sm px-5 py-2.5 bg-green-50 text-green-700 rounded-full inline-flex items-center gap-3 font-semibold border border-green-200 shadow-sm";
+            els.globalStatus.innerHTML = '<i class="fas fa-check-double"></i> <span>Engines Ready.</span>';
+            els.input.placeholder = "Paste paragraph(s) here..."; validateInput();
+        }
+    }
+    function checkGlobalFinished() { if (Object.values(models).every(m => !m.generating)) setBusy(false); updateRadar(); }
 
-        // Send Job to Worker
-        worker.postMessage({ 
-            type: 'generate', 
-            data: { text: inputArea.value } 
-        });
-    };
-
-    function finishGeneration(finalText) {
-        clearInterval(timerInterval);
-        const endTime = performance.now();
-        const totalTime = ((endTime - startTime) / 1000).toFixed(2);
-        
-        // Unlock UI
-        inputArea.classList.remove('busy-disabled');
-        sampleButtons.classList.remove('busy-disabled');
-        generateBtn.disabled = false;
-        generateBtn.innerText = "Generate Paraphrase";
-        
-        // Finalize
-        outputArea.innerText = finalText;
-        document.getElementById('metricLatency').innerText = `${totalTime}s`;
-        updateMetrics(finalText);
+    window.startParallelGeneration = function() {
+        const text = els.input.value.trim(); if (!text) return;
+        setBusy(true);
+        for (const key in models) { models[key].generating = true; models[key].worker.postMessage({ type: 'generate', data: { text: text } }); }
     }
 
-    // 3. Validation & Metrics (Same as before)
-    inputArea.addEventListener('input', validateInput);
-
-    function validateInput() {
-        const text = inputArea.value.trim();
-        const words = text.length === 0 ? 0 : text.split(/\s+/).length;
-        document.getElementById('inputWordCount').innerText = `Words: ${words}`;
-        generateBtn.disabled = !isModelReady || words === 0;
+    function setBusy(isBusy) {
+        els.input.classList.toggle('busy-disabled', isBusy); els.btn.disabled = isBusy;
+        els.btn.innerHTML = isBusy ? '<span class="spinner"></span> Processing...' : '<span>RUN FULL EVALUATION</span> <i class="fas fa-rocket"></i>';
     }
 
-    window.updateMetrics = function(cpgTextOverride = null) {
-        const sourceText = inputArea.value.trim();
-        const cpgText = cpgTextOverride || outputArea.innerText;
-        const llmText = document.getElementById('llmInputText').value.trim();
+    // --- Metrics Engine (Client-Side) ---
+    function calculateAndDisplayMetrics(key) {
+        const src = els.input.value.trim(); const gen = models[key].text;
+        const srcWc = countWords(src); const genWc = countWords(gen);
+        const ratio = srcWc > 0 ? genWc / srcWc : 0;
 
-        if (cpgText.includes("Output will appear")) return;
+        // 1. Basic Stats
+        document.getElementById(`wc${key}`).innerText = `Words: ${genWc}`;
+        const ratioEl = document.getElementById(`ratio${key}`);
+        ratioEl.innerText = `Ratio: ${(ratio*100).toFixed(0)}%`;
+        ratioEl.className = ratio >= 0.8 ? "font-semibold px-2 py-0.5 rounded bg-green-100 text-green-800" : "font-semibold px-2 py-0.5 rounded bg-red-100 text-red-800";
 
-        const sourceWords = sourceText.split(/\s+/).length;
-        const cpgWords = cpgText.split(/\s+/).length;
-        
-        document.getElementById('outputWordCount').innerText = `Words: ${cpgWords}`;
-        const ratio = sourceWords > 0 ? ((cpgWords / sourceWords) * 100).toFixed(1) : 0;
-        document.getElementById('lengthRatio').innerText = `Len Ratio: ${ratio}%`;
-        
-        const compEl = document.getElementById('metricCompliance');
-        compEl.innerText = `${ratio}%`;
-        compEl.className = ratio >= 80 ? "text-2xl font-bold text-green-600" : "text-2xl font-bold text-red-600";
+        // 2. Advanced Metrics
+        const rL = calculateROUGE(src, gen, 'L');
+        const r1 = calculateROUGE(src, gen, '1');
+        const readSrc = calculateReadingEase(src);
+        const readGen = calculateReadingEase(gen);
+        const readDelta = readGen - readSrc;
 
-        if(cpgWords > 0) document.getElementById('metricCpgScore').innerText = calculateJaccard(sourceText, cpgText).toFixed(2);
-        if(llmText.length > 0) document.getElementById('metricLlmScore').innerText = calculateJaccard(sourceText, llmText).toFixed(2);
+        // Store for Radar
+        models[key].metrics = { ...models[key].metrics, ratio, rL, r1, readGen };
+
+        // Update Table
+        document.getElementById(`tLat${key}`).innerText = models[key].metrics.latency.toFixed(2) + "s";
+        document.getElementById(`tRat${key}`).innerText = (ratio*100).toFixed(0) + "%";
+        document.getElementById(`tRl${key}`).innerText = rL.toFixed(3);
+        document.getElementById(`tR1${key}`).innerText = r1.toFixed(3);
+        const readEl = document.getElementById(`tRead${key}`);
+        readEl.innerText = (readDelta > 0 ? "+" : "") + readDelta.toFixed(1);
+        readEl.className = Math.abs(readDelta) < 5 ? "font-mono text-green-600" : "font-mono text-orange-600";
+
+        // 3. Generate Diff View
+        document.getElementById(`output${key}diff`).innerHTML = generateDiffHtml(src, gen);
     }
 
-    function calculateJaccard(str1, str2) {
-        const set1 = new Set(str1.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/));
-        const set2 = new Set(str2.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/));
-        const intersection = new Set([...set1].filter(x => set2.has(x)));
-        const union = new Set([...set1, ...set2]);
-        return union.size === 0 ? 0 : intersection.size / union.size;
+    // ROUGE-L & ROUGE-1 implementation
+    function calculateROUGE(ref, cand, type) {
+        const tokenize = (txt) => txt.toLowerCase().replace(/[^\w\s]/g,'').split(/\s+/).filter(t=>t);
+        const refT = tokenize(ref); const candT = tokenize(cand);
+        if(!refT.length || !candT.length) return 0;
+
+        let overlap = 0; const m = refT.length; const n = candT.length;
+        if (type === 'L') {
+             const dp = Array.from({length:m+1},()=>Array(n+1).fill(0));
+             for(let i=1;i<=m;i++) for(let j=1;j<=n;j++) dp[i][j] = (refT[i-1]===candT[j-1]) ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+             overlap = dp[m][n];
+        } else if (type === '1') {
+             const refSet = new Set(refT); overlap = candT.filter(t => refSet.has(t)).length;
+        }
+        const R = overlap/m; const P = overlap/n; return (P+R===0)?0:(2*R*P)/(R+P);
     }
 
-    window.loadLetterSample = function() {
-        inputArea.value = `Rahul Verma\n23 Green Gardens Road\nBengaluru, Karnataka 560076\nrahul.verma@example.com\n\n+91 98765 43210\n12 December 2025\n\nAnita Sharma\nHiring Manager\nABC Innovations Pvt. Ltd.\nKoramangala, Bengaluru, 560095\n\nDear Ms. Sharma,\n\nI am writing to express my interest in the Associate Product Designer position at ABC Innovations Pvt. Ltd. With a strong foundation in design thinking, user experience principles, and product development, I am confident in my ability to contribute meaningfully to your team.\n\nIn my academic projects and internships, I have developed practical skills in user research, prototyping, and usability testing. I have worked on multiple end-to-end design assignments where I collaborated with cross-functional teams to identify user needs, develop creative solutions, and translate them into functional and visually appealing product designs. My ability to synthesize complex information and transform it into clear, user-centered concepts has been a key strength throughout my experience.\n\nI am particularly drawn to ABC Innovations because of your reputation for combining innovation with human-centered design. The opportunity to learn from your experienced team and to contribute to impactful projects truly excites me. I believe my passion for thoughtful product development and my commitment to continuous learning align well with your organization’s goals.\n\nThank you for considering my application. I welcome the opportunity to discuss how my background and skills can support your team. I look forward to the possibility of speaking with you soon.\n\nSincerely,\nRahul Verma`;
-        validateInput();
+    // Flesch Reading Ease heuristic
+    function calculateReadingEase(text) {
+        if(!text) return 0; const words = countWords(text); const sentences = text.split(/[.!?]+/).filter(s=>s.trim()).length || 1;
+        const syllables = text.toLowerCase().split(/\s+/).reduce((acc, w) => acc + estimateSyllables(w), 0) || 1;
+        return 206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / words);
+    }
+    function estimateSyllables(word) { 
+        word = word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '').replace(/^y/, '');
+        return (word.match(/[aeiouy]{1,2}/g) || []).length || 1;
     }
     
-    window.loadPDFSample = function() {
-        inputArea.value = `A cover letter is a formal document that accompanies your resume when you apply for a job. It serves as an introduction and provides additional context for your application. Here's a breakdown of its various aspects: Purpose The primary purpose of a cover letter is to introduce yourself to the hiring manager and to provide context for your resume. It allows you to elaborate on your qualifications, skills, and experiences in a way that your resume may not fully capture. It's also an opportunity to express your enthusiasm for the role and the company, and to explain why you would be a good fit. Content A typical cover letter includes the following sections: 1. Header: Includes your contact information, the date, and the employer's contact information. 2. Salutation: A greeting to the hiring manager, preferably personalized with their name. 3. Introduction: Briefly introduces who you are and the position you're applying for. 4. Body: This is the core of your cover letter where you discuss your qualifications, experiences, and skills that make you suitable for the job. You can also mention how you can contribute to the company. 5. Conclusion: Summarizes your points and reiterates your enthusiasm for the role. You can also include a call to action, like asking for an interview. 6. Signature: A polite closing ("Sincerely," "Best regards," etc.) followed by your name. Significance in the Job Application Process The cover letter is often the first document that a hiring manager will read, so it sets the tone for your entire application. It provides you with a chance to stand out among other applicants and to make a strong first impression. Some employers specifically require a cover letter, and failing to include one could result in your application being disregarded. In summary, a cover letter is an essential component of a job application that serves to introduce you, elaborate on your qualifications, and make a compelling case for why you should be considered for the position.`;
+    // Simple Diff HTML Generator
+    function generateDiffHtml(src, gen) {
+        const srcWords = src.split(/\s+/); const genWords = gen.split(/\s+/);
+        let html = ""; let i=0, j=0;
+        while(i<srcWords.length || j<genWords.length) {
+            if(i<srcWords.length && j<genWords.length && srcWords[i] === genWords[j]) { html += srcWords[i] + " "; i++; j++; }
+            else if(i < srcWords.length && (j >= genWords.length || !genWords.includes(srcWords[i], j))) { html += `<span class="diff-del">${srcWords[i]}</span> `; i++; }
+            else if(j < genWords.length) { html += `<span class="diff-ins">${genWords[j]}</span> `; j++; }
+        }
+        return html.trim();
+    }
+
+    // --- UI Helpers ---
+    els.input.addEventListener('input', validateInput);
+    function validateInput() {
+        const txt = els.input.value.trim(); const wc = countWords(txt);
+        document.getElementById('inputWc').innerHTML = `<i class="fas fa-font"></i> ${wc} words`;
+        els.btn.disabled = !Object.values(models).every(m=>m.ready) || wc < 5;
+        if(wc>5) document.getElementById('inputReadability').innerHTML = `<i class="fas fa-book-reader"></i> Readability: ${calculateReadingEase(txt).toFixed(1)}`;
+    }
+    function countWords(t) { return t.length===0?0:t.trim().split(/\s+/).length; }
+    window.switchTab = function(key, mode) {
+        document.getElementById(`tab${key}text`).className = mode==='text' ? "flex-1 py-2 text-center tab-active transition-all" : "flex-1 py-2 text-center transition-all";
+        document.getElementById(`tab${key}diff`).className = mode==='diff' ? "flex-1 py-2 text-center tab-active transition-all" : "flex-1 py-2 text-center transition-all";
+        document.getElementById(`output${key}text`).classList.toggle('hidden', mode!=='text');
+        document.getElementById(`output${key}diff`).classList.toggle('hidden', mode!=='diff');
+    }
+    window.copyToClipboard = function(id) {
+        const text = document.getElementById(`${id}text`).innerText; navigator.clipboard.writeText(text);
+        const btn = document.querySelector(`button[onclick="copyToClipboard('${id}')"]`); btn.innerHTML = '<i class="fas fa-check text-green-600"></i>';
+        setTimeout(()=>btn.innerHTML = '<i class="far fa-copy"></i>', 2000);
+    }
+
+    // --- Radar Chart ---
+    function initRadarChart() {
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        radarChart = new Chart(ctx, {
+            type: 'radar',
+            data: { labels: ['ROUGE-L (Struct)', 'ROUGE-1 (Word)', 'Length Ratio', 'Readability'], datasets: [] },
+            options: { maintainAspectRatio: false, scales: { r: { beginAtZero: true, max: 100, ticks: { display: false } } }, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    function updateRadar() {
+        const norm = (val, type) => { if(type==='read') return Math.min(Math.max(val,0),100); return Math.min(val*100, 100); };
+        radarChart.data.datasets = [
+            { label: 'Model A', data: [norm(models.A.metrics.rL), norm(models.A.metrics.r1), norm(models.A.metrics.ratio), norm(models.A.metrics.readGen,'read')], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.2)' },
+            { label: 'Model B', data: [norm(models.B.metrics.rL), norm(models.B.metrics.r1), norm(models.B.metrics.ratio), norm(models.B.metrics.readGen,'read')], borderColor: '#a855f7', backgroundColor: 'rgba(168, 85, 247, 0.2)' }
+        ];
+        radarChart.update();
+    }
+
+    // --- Samples ---
+    window.loadSample = function(type) {
+        els.input.value = type === 'letter' 
+            ? `Dear Hiring Manager,\n\nI am writing to express my strong interest in the open position at your company. With a robust foundation in design thinking principles and end-to-end product development experience, I am confident in my ability to contribute meaningfully to your team. In my recent projects, I have developed practical skills in user research and prototyping. I successfully collaborated with cross-functional teams to translate user needs into viable, visually appealing designs. My ability to synthesize complex information into clear concepts is a key strength. I am drawn to your company because of its reputation for innovation. The opportunity to learn from your experienced team excites me deeply.\n\nSincerely,\nRahul Verma`
+            : `A cover letter is a formal document that accompanies your resume when you apply for a job. It serves as an introduction and provides additional context for your application. The primary purpose of a cover letter is to introduce yourself to the hiring manager. It allows you to elaborate on your qualifications, skills, and experiences in a way that your resume may not fully capture. It's also an opportunity to express your enthusiasm for the role and the company, and to explain why you would be a good fit. A typical cover letter includes sections like the Header, Salutation, Introduction, Body paragraphs, and a Conclusion.`;
         validateInput();
     }
 
-    // Start Worker on Load
-    initWorker();
+    initSystem();
 </script>
-
 </body>
 </html>
